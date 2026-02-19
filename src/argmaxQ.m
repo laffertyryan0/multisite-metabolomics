@@ -7,7 +7,9 @@ function [alpha_est_new,rho_est_new,sigma_rho_est_new] = ...
                                                         w, ...
                                                         learning_rate,...
                                                         max_iterations, ...
-                                                        tol)
+                                                        tol, ...
+                                                        INIT_GDVARS_RANDLY, ...
+                                                        NEARCORR_PROJ)
 % Calculates the values for alpha_tilde, rho_tilde and sigma_rho_tilde
 % that maximize Q(alpha_tilde, rho_tilde, sigma_rho_tilde | alpha_est,
 % rho_est, and sigma_rho_est, where Q is defined in the paper. 
@@ -26,11 +28,26 @@ function [alpha_est_new,rho_est_new,sigma_rho_est_new] = ...
 L = length(X);
 r = length(alpha_est);
 len_rho = length(rho_est{1}); % = k(k-1)/2
+k = floor((1+sqrt(1+8*len_rho))/2);
 
-% Initialize grad variables to current estimates
+% Initialize grad variables randomly
+if(INIT_GDVARS_RANDLY)
+    alpha_tilde = rand(1,r);
+    alpha_tilde = alpha_tilde/sum(alpha_tilde); % Random initialization
+    rho_tilde = cell(1,r);
+    sigma_rho_tilde = cell(1,r);
+    for j = 1:r
+        rho_tilde{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
+        sigma_rho_tilde = sigma_rho_est; % This doesn't change
+    end
+else
+    % Otherwise, initialize to current estimates
+    alpha_tilde = alpha_est;
+    rho_tilde = rho_est;
+    sigma_rho_tilde = sigma_rho_est;
 
-rho_tilde = rho_est;
-sigma_rho_tilde = sigma_rho_est;
+end
+
 
 iteration = 1;
 norm_grad = Inf;
@@ -44,7 +61,7 @@ norm_grad = Inf;
 pr_x_given_g = zeros(L,r);
 
 % THIS LOOP IS SLOW: FIX 
-mu_z_given_x = cell(L,r);
+mu_Z_given_X = cell(L,r);
 for j=1:r
     for l=1:L
         x_len = length(X{l});
@@ -53,13 +70,13 @@ for j=1:r
         mu_Z_est = mu_est((x_len+1):end);
         sig_est = w(l)*P{l}*sigma_rho_est{j}*P{l}'; 
         sig_XX_est = sig_est(1:x_len,1:x_len);
-        sig_ZX_est = sig_est(1:x_len,(x_len+1):end);
+        sig_XZ_est = sig_est(1:x_len,(x_len+1):end);
         % Calculate conditional mean Z|X, which we will need for rho_tilde
         mu_Z_given_X{l,j} = ...
-                mu_Z_est + sig_ZX_est'*...
+                mu_Z_est + sig_XZ_est'*...
                 ((sig_XX_est)\(X{l}-mu_X_est)); %mu_{Z given X} or mu_{2|1}
         % Calculate likelihood
-        pr_x_given_g(l,:) = mvnpdf(X{l},mu_X_est,sig_XX_est)+eps;
+        pr_x_given_g(l,j) = mvnpdf(X{l},mu_X_est,sig_XX_est)+eps;
     end
 end
 
@@ -93,32 +110,40 @@ while iteration <= max_iterations & norm_grad >= tol
                     for l = 1:L
                         % l'th term in rho gradient sum 
                         total = total + ...
-                           pr_g_given_x(l,j)*...
+                           pr_g_given_x(l,i)*...
                            P{l}'*inv(w(l)*P{l}*sigma_rho_tilde{i}*P{l}')...
                            *([X{l} ; mu_Z_given_X{l,i}] - ...
                            P{l}*rho_tilde{i});
                     end
-                    gradient_rho_tilde{i} = -total;%zeros(len_rho,1);
+                    gradient_rho_tilde{i} = total;
                 end
 
     % Step 3.2: Apply the gradient step to remaining optimization (tilde) 
     %           variables (rho_tilde)
 
                 for j=1:r
-                    rho_tilde{j} = rho_tilde{j} - ...
+                    rho_tilde{j} = rho_tilde{j} + ...
                                    learning_rate*gradient_rho_tilde{j};
                 end
+
 
     % Step 3.3: Apply the correlation projection to rho_tilde. Will need
     %           to convert to matrix form, apply projection, and convert
     %           back to vector form. 
 
+                if(NEARCORR_PROJ)
+                    for j=1:r
+                        matrix_rho_tilde = vecLInverse(rho_tilde{j});
+                        matrix_rho_tilde = ensureValidNearCorrInput(...
+                                                matrix_rho_tilde,.01);
+                        matrix_rho_tilde = nearcorr(matrix_rho_tilde);
+                        rho_tilde{j} = vecL(matrix_rho_tilde);
+                    end
+                end
+                
+                norm_grad = 0;
                 for j=1:r
-                    matrix_rho_tilde = vecLInverse(rho_tilde{j});
-                    matrix_rho_tilde = ensureValidNearCorrInput(...
-                                            matrix_rho_tilde,.01);
-                    matrix_rho_tilde = nearcorr(matrix_rho_tilde);
-                    rho_tilde{j} = vecL(matrix_rho_tilde);
+                    norm_grad = norm_grad + norm(gradient_rho_tilde{j});
                 end
 
 end

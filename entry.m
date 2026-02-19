@@ -6,11 +6,11 @@ addpath('./src')
 tic
 
 % We have k metabolites
-k = 20;
+k = 100;
 % We have L labs 
-L = 4;
+L = 200;
 
-average_fraction_missing_metabolites = .1; % approx what proportion of 
+average_fraction_missing_metabolites = .3; % approx what proportion of 
                                            % metabolites
                                            % are missing (1 = all missing
                                            % 0 = none missing)
@@ -96,7 +96,7 @@ for l=1:L
     
     % The following has some entries masked out. Those entries are zero
     % and are meaningless
-    reported_spearman{l} = corr(subject_data{l},'Type','Spearman');
+    reported_spearman{l} = corr(subject_data{l},'Type','Pearson'); %DEBUG
     reported_spearman_mask{l} = ones(k,k);
     reported_spearman_mask{l}(:,covariate_mask==0)=0;
     reported_spearman_mask{l}(covariate_mask==0,:)=0;
@@ -142,10 +142,14 @@ for l=1:L
     X{l} = X_Z(1:num_observed);
 end
 
-MAX_EM_ITERATIONS = 300; % Outer loop
-MAX_GD_ITERATIONS = 100; % Inner PGD loop
-GD_TOLERANCE = .001;
-GD_LEARNING_RATE = 0.1;
+
+MAX_EM_ITERATIONS = 30; % Outer loop
+MAX_GD_ITERATIONS = 50; % Inner PGD loop
+GD_TOLERANCE = 1;
+GD_LEARNING_RATE = 0.2/L;
+INIT_GDVARS_RANDLY = false;
+NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
+
 
 % Initialize EM parameters
 alpha_est = rand(1,r);
@@ -154,13 +158,26 @@ rho_est = cell(1,r);
 sigma_rho_est = cell(1,r);
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
-    sigma_rho_est{j} = speye(k*(k-1)/2);
+    sigma_rho_est{j} = .1*speye(k*(k-1)/2); %why magic number .3?
+    %.1*(rand+.5)*randomCorrelationMatrix(k*(k-1)/2);%speye(k*(k-1)/2);
 end
 
-w = sqrt(mean(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for variances (L vector)
+w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for variances (L vector)
 
 
 for em_iter=1:MAX_EM_ITERATIONS
+
+    disp("DEBUG: ")
+    disp("Estimate: ")
+    estimated1 = vecLInverse(rho_est{1,1});
+    estimated2 = vecLInverse(rho_est{1,2});
+    disp(estimated1(1:min(5,k),1:min(5,k)))
+    disp(estimated2(1:min(5,k),1:min(5,k)))
+    disp("Actual:")
+    disp(rho_state{1,1}(1:min(5,k),1:min(5,k)));
+    disp(rho_state{2}(1:min(5,k),1:min(5,k)));
+
+
     % Update the EM using the following formula: 
     % theta^{(t+1)} = argmax_{theta_tilde} Q(theta_tilde | theta^{(t)})
     % Here, theta represents the current estimate of parameters:
@@ -189,9 +206,19 @@ for em_iter=1:MAX_EM_ITERATIONS
                                                 w, ...
                                                 GD_LEARNING_RATE,...
                                                 MAX_GD_ITERATIONS, ...
-                                                GD_TOLERANCE);
+                                                GD_TOLERANCE, ...
+                                                INIT_GDVARS_RANDLY, ...
+                                                NEARCORR_PROJ);
     fprintf("EM Iteration Number: %d\n",em_iter);
     fprintf("Current alpha estimate: ");
     disp(alpha_est);
     fprintf("\n");
+   
 end
+
+%DEBUG
+% hold on
+% scatter(1:L,cell2mat(X))
+% plot(1:L,ones(L,1)*rho_est{1,1}(1))
+% %plot(1:L,ones(L,1)*rho_est{1,2}(1))
+% hold off
