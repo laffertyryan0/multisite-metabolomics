@@ -6,11 +6,11 @@ addpath('./src')
 tic
 
 % We have k metabolites
-k = 200;
+k = 100;
 % We have L labs 
-L = 300;
+L = 200;
 
-average_fraction_missing_metabolites = .5; % approx what proportion of 
+average_fraction_missing_metabolites = .3; % approx what proportion of 
                                            % metabolites
                                            % are missing (1 = all missing
                                            % 0 = none missing)
@@ -21,6 +21,7 @@ average_fraction_missing_metabolites = .5; % approx what proportion of
 r = 2;
 alpha = ones(1,r)/r; % The alpha_j are the probabilities of a lab being 
                    % selected as state j
+
 
 Gamma = mnrnd(1,alpha,L); % multinomial dist with n=1 is categorical dist
                           % Gamma is Lxr with each row a One Hot Encoded
@@ -95,7 +96,7 @@ for l=1:L
     
     % The following has some entries masked out. Those entries are zero
     % and are meaningless
-    reported_spearman{l} = corr(subject_data{l},'Type','Spearman');
+    reported_spearman{l} = corr(subject_data{l},'Type','Pearson'); %DEBUG
     reported_spearman_mask{l} = ones(k,k);
     reported_spearman_mask{l}(:,covariate_mask==0)=0;
     reported_spearman_mask{l}(covariate_mask==0,:)=0;
@@ -141,41 +142,83 @@ for l=1:L
     X{l} = X_Z(1:num_observed);
 end
 
-MAX_EM_ITERATIONS = 1; % Outer loop
-MAX_GD_ITERATIONS = 1; % Inner PGD loop
-GD_TOLERANCE = .001;
-GD_LEARNING_RATE = 0.01;
+
+MAX_EM_ITERATIONS = 30; % Outer loop
+MAX_GD_ITERATIONS = 50; % Inner PGD loop
+GD_TOLERANCE = 1;
+GD_LEARNING_RATE = 0.2/L;
+INIT_GDVARS_RANDLY = false;
+NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
+
 
 % Initialize EM parameters
 alpha_est = rand(1,r);
 alpha_est = alpha_est/sum(alpha_est); % Random initialization
-rho_est = cell(1,L);
-sigma_rho_est = cell(1,L);
-for l = 1:L
-    rho_est{l} = vecL(randomCorrelationMatrix(k)); % Random initialization
-    sigma_rho_est = speye(k*(k-1)/2)/...
-                     sqrt(n_subjects(l));
+rho_est = cell(1,r);
+sigma_rho_est = cell(1,r);
+for j = 1:r
+    rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
+    sigma_rho_est{j} = .1*speye(k*(k-1)/2); %why magic number .3?
+    %.1*(rand+.5)*randomCorrelationMatrix(k*(k-1)/2);%speye(k*(k-1)/2);
 end
+
+w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for variances (L vector)
 
 
 for em_iter=1:MAX_EM_ITERATIONS
+
+    disp("DEBUG: ")
+    disp("Estimate: ")
+    estimated1 = vecLInverse(rho_est{1,1});
+    estimated2 = vecLInverse(rho_est{1,2});
+    disp(estimated1(1:min(5,k),1:min(5,k)))
+    disp(estimated2(1:min(5,k),1:min(5,k)))
+    disp("Actual:")
+    disp(rho_state{1,1}(1:min(5,k),1:min(5,k)));
+    disp(rho_state{2}(1:min(5,k),1:min(5,k)));
+
+
     % Update the EM using the following formula: 
     % theta^{(t+1)} = argmax_{theta_tilde} Q(theta_tilde | theta^{(t)})
     % Here, theta represents the current estimate of parameters:
     % alpha_est: a r-dimensional vector of mixing probabilities
-    % rho_est: a cell array of L cells, where rho_est{l} is a 
+    % rho_est: a cell array of r cells, where rho_est{j} is a 
     %          vector of length k(k-1)/2. (A vectorized correlation matrix)
-    % sigma_rho_est: a cell array of L cells, where sigma_est{l} is a 
+    % sigma_rho_est: a cell array of r cells, where sigma_est{j} is a 
     %              (k(k-1)/2) x (k(k-1)/2) covariance matrix.
     % For now, we will not estimate sigma_rho_est, but just let it remain 
     % fixed. Later, we will try to show that this is a good approximation.
+    % X: The observed data (a cell array where each lab is a cell)
+    % P: The cell array of permutation matrices that rearrange X and Z
+    % w: lab-wise weighting that multiplies the covariance matrices
+    % GD_LEARNING_RATE: The rate parameter for gradient descent
+    % MAX_GD_ITERATIONS: Number of iterations for GD in each EM step. This
+    %                    can be small, since it is not mandatory for the
+    %                    gradient descent to converge in each step
+    % GD_TOLERANCE: If the gradient steps fall below this tolerance, the 
+    %               gradient descent loop will cease.
 
     [alpha_est,rho_est,sigma_rho_est] = argmaxQ(alpha_est,...
                                                 rho_est,...
                                                 sigma_rho_est, ...
+                                                X, ...
                                                 P, ...
+                                                w, ...
                                                 GD_LEARNING_RATE,...
                                                 MAX_GD_ITERATIONS, ...
-                                                GD_TOLERANCE);
+                                                GD_TOLERANCE, ...
+                                                INIT_GDVARS_RANDLY, ...
+                                                NEARCORR_PROJ);
     fprintf("EM Iteration Number: %d\n",em_iter);
+    fprintf("Current alpha estimate: ");
+    disp(alpha_est);
+    fprintf("\n");
+   
 end
+
+%DEBUG
+% hold on
+% scatter(1:L,cell2mat(X))
+% plot(1:L,ones(L,1)*rho_est{1,1}(1))
+% %plot(1:L,ones(L,1)*rho_est{1,2}(1))
+% hold off
