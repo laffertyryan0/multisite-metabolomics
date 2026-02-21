@@ -14,6 +14,6 @@ function testTimeTaken(testCase)
     v = [zeros(200000,1) ones(200000,1)];
     P = getMaskOrderingMatrix(v);
     time = toc;
-    fprintf("Time to order mask matrix: %.2f",time);
+    fprintf("Time to order mask matrix: %.2f sec",time);
     verifyLessThan(testCase,time,10);
 end
