@@ -96,7 +96,7 @@ for l=1:L
     
     % The following has some entries masked out. Those entries are zero
     % and are meaningless
-    reported_spearman{l} = corr(subject_data{l},'Type','Pearson'); %DEBUG
+    reported_spearman{l} = corr(subject_data{l},'Type','Spearman'); %DEBUG
     reported_spearman_mask{l} = ones(k,k);
     reported_spearman_mask{l}(:,covariate_mask==0)=0;
     reported_spearman_mask{l}(covariate_mask==0,:)=0;
@@ -156,6 +156,9 @@ alpha_est = rand(1,r);
 alpha_est = alpha_est/sum(alpha_est); % Random initialization
 rho_est = cell(1,r);
 sigma_rho_est = cell(1,r);
+
+pearson_rho_est = cell(1,r); % Update this on every EM iteration
+
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
     sigma_rho_est{j} = .1*speye(k*(k-1)/2); %why magic number .3?
@@ -167,10 +170,14 @@ w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for va
 
 for em_iter=1:MAX_EM_ITERATIONS
 
+    for j=1:r
+        pearson_rho_est{j} = spearmanToPearson(rho_est{j});
+    end
+
     disp("DEBUG: ")
     disp("Estimate: ")
-    estimated1 = vecLInverse(rho_est{1,1});
-    estimated2 = vecLInverse(rho_est{1,2});
+    estimated1 = vecLInverse(pearson_rho_est{1,1});
+    estimated2 = vecLInverse(pearson_rho_est{1,2});
     disp(estimated1(1:min(5,k),1:min(5,k)))
     disp(estimated2(1:min(5,k),1:min(5,k)))
     disp("Actual:")
@@ -215,6 +222,8 @@ for em_iter=1:MAX_EM_ITERATIONS
     fprintf("\n");
    
 end
+
+%pearson_rho_est is the final estimate for the mean correlation matrix
 
 %DEBUG
 % hold on
