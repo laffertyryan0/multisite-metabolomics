@@ -128,8 +128,14 @@ reported_spearman_vecL = cellfun(@vecL,reported_spearman,...
 reported_spearman_mask_vecL = cellfun(@vecL,reported_spearman_mask,...
                                         'UniformOutput',false);
 
+% Calculate Pearson using Gaussian assumption
+repoted_pearson = cellfun(@spearmanToPearson,reported_spearman, ...
+                                        'UniformOutput',false);
+reported_pearson_vecL = cellfun(@vecL,reported_spearman,...
+                                    'UniformOutput',false);
+
 % For each l, find the permutation matrix P_l that puts missing entries 
-% below observed entries. Let [X Z]' = P_l * vecL(reported_spearman)
+% below observed entries. Let [X Z]' = P_l * vecL(reported_pearson)
 P = {}; 
 X = {}; % Consists of all observed entries. 
         % Z here would be represented as all 0's due to the masking, but 
@@ -138,7 +144,7 @@ X = {}; % Consists of all observed entries.
 for l=1:L
     P{l} = getMaskOrderingMatrix(reported_spearman_mask_vecL{l});
     num_observed = sum(reported_spearman_mask_vecL{l});
-    X_Z = P{l}*reported_spearman_vecL{l};
+    X_Z = P{l}*reported_pearson_vecL{l};
     X{l} = X_Z(1:num_observed);
 end
 
@@ -170,14 +176,11 @@ w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for va
 
 for em_iter=1:MAX_EM_ITERATIONS
 
-    for j=1:r
-        pearson_rho_est{j} = spearmanToPearson(rho_est{j});
-    end
 
     disp("DEBUG: ")
     disp("Estimate: ")
-    estimated1 = vecLInverse(pearson_rho_est{1,1});
-    estimated2 = vecLInverse(pearson_rho_est{1,2});
+    estimated1 = vecLInverse(rho_est{1,1});
+    estimated2 = vecLInverse(rho_est{1,2});
     disp(estimated1(1:min(5,k),1:min(5,k)))
     disp(estimated2(1:min(5,k),1:min(5,k)))
     disp("Actual:")
