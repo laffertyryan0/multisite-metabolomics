@@ -96,7 +96,7 @@ for l=1:L
     
     % The following has some entries masked out. Those entries are zero
     % and are meaningless
-    reported_spearman{l} = corr(subject_data{l},'Type','Pearson'); %DEBUG
+    reported_spearman{l} = corr(subject_data{l},'Type','Spearman'); %DEBUG
     reported_spearman_mask{l} = ones(k,k);
     reported_spearman_mask{l}(:,covariate_mask==0)=0;
     reported_spearman_mask{l}(covariate_mask==0,:)=0;
@@ -128,8 +128,14 @@ reported_spearman_vecL = cellfun(@vecL,reported_spearman,...
 reported_spearman_mask_vecL = cellfun(@vecL,reported_spearman_mask,...
                                         'UniformOutput',false);
 
+% Calculate Pearson using Gaussian assumption
+repoted_pearson = cellfun(@spearmanToPearson,reported_spearman, ...
+                                        'UniformOutput',false);
+reported_pearson_vecL = cellfun(@vecL,reported_spearman,...
+                                    'UniformOutput',false);
+
 % For each l, find the permutation matrix P_l that puts missing entries 
-% below observed entries. Let [X Z]' = P_l * vecL(reported_spearman)
+% below observed entries. Let [X Z]' = P_l * vecL(reported_pearson)
 P = {}; 
 X = {}; % Consists of all observed entries. 
         % Z here would be represented as all 0's due to the masking, but 
@@ -138,7 +144,7 @@ X = {}; % Consists of all observed entries.
 for l=1:L
     P{l} = getMaskOrderingMatrix(reported_spearman_mask_vecL{l});
     num_observed = sum(reported_spearman_mask_vecL{l});
-    X_Z = P{l}*reported_spearman_vecL{l};
+    X_Z = P{l}*reported_pearson_vecL{l};
     X{l} = X_Z(1:num_observed);
 end
 
@@ -156,6 +162,9 @@ alpha_est = rand(1,r);
 alpha_est = alpha_est/sum(alpha_est); % Random initialization
 rho_est = cell(1,r);
 sigma_rho_est = cell(1,r);
+
+pearson_rho_est = cell(1,r); % Update this on every EM iteration
+
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
     sigma_rho_est{j} = .1*speye(k*(k-1)/2); %why magic number .3?
@@ -166,6 +175,7 @@ w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for va
 
 
 for em_iter=1:MAX_EM_ITERATIONS
+
 
     disp("DEBUG: ")
     disp("Estimate: ")
@@ -215,6 +225,8 @@ for em_iter=1:MAX_EM_ITERATIONS
     fprintf("\n");
    
 end
+
+%pearson_rho_est is the final estimate for the mean correlation matrix
 
 %DEBUG
 % hold on
