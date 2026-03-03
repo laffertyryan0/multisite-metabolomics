@@ -129,9 +129,9 @@ reported_spearman_mask_vecL = cellfun(@vecL,reported_spearman_mask,...
                                         'UniformOutput',false);
 
 % Calculate Pearson using Gaussian assumption
-repoted_pearson = cellfun(@spearmanToPearson,reported_spearman, ...
+reported_pearson = cellfun(@spearmanToPearson,reported_spearman, ...
                                         'UniformOutput',false);
-reported_pearson_vecL = cellfun(@vecL,reported_spearman,...
+reported_pearson_vecL = cellfun(@vecL,reported_pearson,...
                                     'UniformOutput',false);
 
 % For each l, find the permutation matrix P_l that puts missing entries 
@@ -162,8 +162,6 @@ alpha_est = rand(1,r);
 alpha_est = alpha_est/sum(alpha_est); % Random initialization
 rho_est = cell(1,r);
 sigma_rho_est = cell(1,r);
-
-pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
@@ -235,7 +233,6 @@ for em_iter=1:MAX_EM_ITERATIONS
    
 end
 
-%pearson_rho_est is the final estimate for the mean correlation matrix
 
 %DEBUG
 % hold on
