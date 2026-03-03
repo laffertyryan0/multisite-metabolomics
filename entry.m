@@ -10,7 +10,7 @@ k = 100;
 % We have L labs 
 L = 200;
 
-average_fraction_missing_metabolites = .3; % approx what proportion of 
+average_fraction_missing_metabolites = .5; % approx what proportion of 
                                            % metabolites
                                            % are missing (1 = all missing
                                            % 0 = none missing)
@@ -28,8 +28,8 @@ Gamma = mnrnd(1,alpha,L); % multinomial dist with n=1 is categorical dist
                           % lab state
 
 
-% Number of subjects in lab l is n_subj(l)
-n_subjects = ones(L,1)*100;  % In this case assume 100 per lab
+% Number of subjects in lab l is n_subjects(l)
+n_subjects = ones(L,1)*1000;  % In this case assume 1000 per lab
 
 % Each lab recruits n_subjects(l) patients, all with the same state gamma_l
 % Why? because gamma_l is specific to a (say) regional population,
@@ -96,7 +96,7 @@ for l=1:L
     
     % The following has some entries masked out. Those entries are zero
     % and are meaningless
-    reported_spearman{l} = corr(subject_data{l},'Type','Spearman'); %DEBUG
+    reported_spearman{l} = corr(subject_data{l},'Type','Spearman');
     reported_spearman_mask{l} = ones(k,k);
     reported_spearman_mask{l}(:,covariate_mask==0)=0;
     reported_spearman_mask{l}(covariate_mask==0,:)=0;
@@ -152,7 +152,7 @@ end
 MAX_EM_ITERATIONS = 30; % Outer loop
 MAX_GD_ITERATIONS = 50; % Inner PGD loop
 GD_TOLERANCE = 1;
-GD_LEARNING_RATE = 0.2/L;
+GD_LEARNING_RATE = (0.2/L)/max(n_subjects);
 INIT_GDVARS_RANDLY = false;
 NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
 
@@ -167,12 +167,21 @@ pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
-    sigma_rho_est{j} = .1*speye(k*(k-1)/2); %why magic number .3?
+    sigma_rho_est{j} = speye(k*(k-1)/2);  % constant depends on r. 1 if r=1, .1 if r=2
     %.1*(rand+.5)*randomCorrelationMatrix(k*(k-1)/2);%speye(k*(k-1)/2);
 end
 
-w = mean(sqrt(n_subjects))./sqrt(n_subjects); % Lab-wise weighting factor for variances (L vector)
+w = 1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
+%%% DEBUG
+a = [];
+for l = 1:L
+    a(l) = reported_pearson_vecL{l}(2);
+end
+disp("Var(X(2)):")
+disp(var(a(a~=0)))
+%scatter(1:L,a)
+%%%
 
 for em_iter=1:MAX_EM_ITERATIONS
 
