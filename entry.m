@@ -176,7 +176,6 @@ w = 1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
 for em_iter=1:MAX_EM_ITERATIONS
 
-
     disp("DEBUG: ")
     disp("Estimate: ")
     estimated1 = vecLInverse(rho_est{1,1});
@@ -227,10 +226,3 @@ for em_iter=1:MAX_EM_ITERATIONS
 end
 
 %pearson_rho_est is the final estimate for the mean correlation matrix
-
-%DEBUG
-% hold on
-% scatter(1:L,cell2mat(X))
-% plot(1:L,ones(L,1)*rho_est{1,1}(1))
-% %plot(1:L,ones(L,1)*rho_est{1,2}(1))
-% hold off
