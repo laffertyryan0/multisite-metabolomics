@@ -76,7 +76,7 @@ for j=1:r
                 mu_Z_est + sig_XZ_est'*...
                 ((sig_XX_est)\(X{l}-mu_X_est)); %mu_{Z given X} or mu_{2|1}
         % Calculate likelihood
-        pr_x_given_g(l,j) = mvnpdf(X{l},mu_X_est,sig_XX_est)+eps;
+        pr_x_given_g(l,j) = min(1/eps,mvnpdf(X{l},mu_X_est,sig_XX_est)+eps);
     end
 end
 
