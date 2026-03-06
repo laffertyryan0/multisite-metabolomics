@@ -173,15 +173,6 @@ end
 
 w = 1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
-%%% DEBUG
-a = [];
-for l = 1:L
-    a(l) = reported_pearson_vecL{l}(2);
-end
-disp("Var(X(2)):")
-disp(var(a(a~=0)))
-%scatter(1:L,a)
-%%%
 
 for em_iter=1:MAX_EM_ITERATIONS
 
