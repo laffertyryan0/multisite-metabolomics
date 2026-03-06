@@ -144,7 +144,7 @@ X = {}; % Consists of all observed entries.
 for l=1:L
     P{l} = getMaskOrderingMatrix(reported_spearman_mask_vecL{l});
     num_observed = sum(reported_spearman_mask_vecL{l});
-    X_Z = P{l}*reported_pearson_vecL{l};
+    X_Z = P{l}*reported_spearman_vecL{l};
     X{l} = X_Z(1:num_observed);
 end
 
@@ -162,6 +162,8 @@ alpha_est = rand(1,r);
 alpha_est = alpha_est/sum(alpha_est); % Random initialization
 rho_est = cell(1,r);
 sigma_rho_est = cell(1,r);
+
+pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = vecL(randomCorrelationMatrix(k)); % Random initialization
@@ -233,6 +235,7 @@ for em_iter=1:MAX_EM_ITERATIONS
    
 end
 
+%pearson_rho_est is the final estimate for the mean correlation matrix
 
 %DEBUG
 % hold on
