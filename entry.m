@@ -175,17 +175,19 @@ w = 1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
 
 for em_iter=1:MAX_EM_ITERATIONS
+    disp("=========================================================")
+    fprintf("EM Iteration Number: %d\n",em_iter);
 
-    disp("DEBUG: ")
-    disp("Estimate: ")
-    estimated1 = vecLInverse(rho_est{1,1});
-    estimated2 = vecLInverse(rho_est{1,2});
-    disp(estimated1(1:min(5,k),1:min(5,k)))
-    disp(estimated2(1:min(5,k),1:min(5,k)))
-    disp("Actual:")
-    disp(rho_state{1,1}(1:min(5,k),1:min(5,k)));
-    disp(rho_state{2}(1:min(5,k),1:min(5,k)));
+    % Log current estimate for mixing probabilities
+    fprintf("Current alpha estimate: ");
+    disp(alpha_est);
+    fprintf("\n");
 
+    % Log intermediate spearman correlation matrix calculations
+    % and compare with true pearson correlation
+    displayMatrixComparison(rho_est,rho_state,4);
+
+    % Show current alpha estimate
 
     % Update the EM using the following formula: 
     % theta^{(t+1)} = argmax_{theta_tilde} Q(theta_tilde | theta^{(t)})
@@ -218,10 +220,7 @@ for em_iter=1:MAX_EM_ITERATIONS
                                                 GD_TOLERANCE, ...
                                                 INIT_GDVARS_RANDLY, ...
                                                 NEARCORR_PROJ);
-    fprintf("EM Iteration Number: %d\n",em_iter);
-    fprintf("Current alpha estimate: ");
-    disp(alpha_est);
-    fprintf("\n");
+
    
 end
 
