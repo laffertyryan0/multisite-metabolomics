@@ -10,19 +10,29 @@ function displayMatrixComparison(rho_est, ...
     disp("Comparison of Estimated and Actual Correlation Matrices: ")
     fprintf("\nNumber of entries shown: %d x %d \n\n",display_width,display_width)
 
+    estimated = {};
+    actual = {};
+
+    average_errors = [];
+
     % Estimated Spearman
     disp("Estimate: ")
     for j=1:r
-        estimated = vecLInverse(rho_est{1,j});
-        disp(estimated(1:display_width,1:display_width))
+        estimated{j} = vecLInverse(rho_est{1,j});
+        disp(estimated{j}(1:display_width,1:display_width))
     end
 
     % Actual Pearson
     disp("Actual:")
     for j=1:r
-        actual = rho_actual{1,j};
-        disp(actual(1:display_width,1:display_width))
+        actual{j} = rho_actual{1,j};
+        disp(actual{j}(1:display_width,1:display_width))
+        average_errors(j) = sum(abs(vecL(estimated{j}) - ...
+                                vecL(actual{j})),'all');
     end
+
+    disp("Average Errors:")
+    disp(average_errors)
     
     disp("=========================================================")
 
