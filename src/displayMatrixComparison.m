@@ -31,31 +31,34 @@ function displayMatrixComparison(rho_est, ...
     
     for j1=1:r
         for j2=1:r
-            sqdiff(j1,j2) = sum((actual{j1}-estimated{j2})^2,'all');
+            sqdiff(j1,j2) = sum((actual{j2}-estimated{j1})^2,'all');
         end
     end
 
     % Likely order of estimated matrices, found by taking the smallest of 
     % each row in sqdiff, that is, the actual{j} that is closest to the
-    % given estimated
+    % given estimated. If a column has already been taken, take the second
+    % smallest, then the third smallest, and so on. There can only be one
+    % column taken by each row. 
 
-    [~,order] = min(sqdiff,[],2);
+    order = []; % a column selected for the jth row
+
+    for j_row=1:r
+        row = sqdiff(j_row,:);
+        row(ismember(1:r,order)) = Inf;
+        [~,min_idx_for_this_row] = min(row,[],2);
+        order(j_row) = min_idx_for_this_row;
+    end
 
     for j=1:r
         average_errors(j) = mean(abs(vecL(estimated{j}) - ...
                                 vecL(actual{order(j)})),'all');
     end
 
-    if length(unique(order))==r
-        matrix_display_order = order;
-    else
-        matrix_display_order = 1:r;
-    end
-
     % Estimated Spearman
     disp("Estimate: ")
     for j=1:r
-        disp(estimated{matrix_display_order(j)}...
+        disp(estimated{order(j)}...
             (1:display_width,1:display_width))
     end
 
@@ -63,14 +66,6 @@ function displayMatrixComparison(rho_est, ...
     disp("Actual:")
     for j=1:r
         disp(actual{j}(1:display_width,1:display_width))
-    end
-
-
-    % TODO: There is potentially a problem if order has repeated elements
-    % find a solution for this. For now just warn
-
-    if length(unique(order))~=r
-        warning("Unable to find order of estimates. Absolute error may be inaccurate. ")
     end
 
     disp("Average Absolute Errors:")
