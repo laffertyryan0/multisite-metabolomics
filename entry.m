@@ -3,14 +3,17 @@ addpath('./src')
 
 %% Simulate data
 
+%set seed
+rng(10);
+
 tic
 
 % We have k metabolites
-k = 100;
+k = 50;
 % We have L labs 
-L = 200;
+L = 100;
 
-average_fraction_missing_metabolites = .5; % approx what proportion of 
+average_fraction_missing_metabolites = .0; % approx what proportion of 
                                            % metabolites
                                            % are missing (1 = all missing
                                            % 0 = none missing)
@@ -29,7 +32,7 @@ Gamma = mnrnd(1,alpha,L); % multinomial dist with n=1 is categorical dist
 
 
 % Number of subjects in lab l is n_subjects(l)
-n_subjects = ones(L,1)*1000;  % In this case assume 1000 per lab
+n_subjects = ones(L,1)*100;  % In this case assume 1000 per lab
 
 % Each lab recruits n_subjects(l) patients, all with the same state gamma_l
 % Why? because gamma_l is specific to a (say) regional population,
@@ -51,6 +54,9 @@ rho_state = {}; % cell array where rho_state{j} is the kxk rho matrix for
 
 for j=1:r
     rho_state{j} = randomCorrelationMatrix(k); % k = number of metabolites
+    if j==1
+        rho_state{j} = eye(k,k);
+    end
     assert(min(eig(rho_state{j}))>= 0, ...
         "Non-PSD matrix found for simulation rho_i.")
 end
@@ -149,11 +155,11 @@ for l=1:L
 end
 
 
-MAX_EM_ITERATIONS = 30; % Outer loop
+MAX_EM_ITERATIONS = 300; % Outer loop
 MAX_GD_ITERATIONS = 50; % Inner PGD loop
 GD_TOLERANCE = 1;
-GD_LEARNING_RATE = (0.2/L)/max(n_subjects);
-INIT_GDVARS_RANDLY = false;
+GD_LEARNING_RATE = 100*(.2/L)/max(n_subjects);
+INIT_GDVARS_RANDLY = true;
 NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
 
 
@@ -171,7 +177,7 @@ for j = 1:r
     %.1*(rand+.5)*randomCorrelationMatrix(k*(k-1)/2);%speye(k*(k-1)/2);
 end
 
-w = 1./n_subjects; % Lab-wise weighting factor for variances (L vector)
+w = 100*1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
 
 for em_iter=1:MAX_EM_ITERATIONS
