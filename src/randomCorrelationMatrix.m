@@ -6,7 +6,8 @@ function out = randomCorrelationMatrix(sz)
     % sz: height and width of desired matrix
     %
     % out: a random correlation matrix of size sz x sz
-    A = randn(sz, sz);
+    shift = rand*2-1;
+    A = shift+rand(sz, sz);
     S = A' * A;
     d = sqrt(diag(S)); 
     out = S ./ (d * d'); 

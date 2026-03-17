@@ -58,13 +58,20 @@ norm_grad = Inf;
 % This is normal with mean mu = (P_l rho_j)_{1...len(X)} and Sigma = 
 % (P_l Sigma_rho,j P_l')_{1...len(X),1...len(X)}, that is the XX block
 % of the joint (X,Z) distribution 
-pr_x_given_g = zeros(L,r);
+pr_x_given_g_abs = zeros(L,r);
+pr_x_given_g_rel = zeros(L,r);
+
 
 % THIS LOOP IS SLOW: FIX 
 mu_Z_given_X = cell(L,r);
-for j=1:r
-    for l=1:L
-        x_len = length(X{l});
+for l=1:L
+    x_len = length(X{l});
+    mu_est_j1 = P{l}*rho_est{1};
+    mu_X_est_j1 = mu_est_j1(1:x_len); 
+    sig_est_j1 = w(l)*P{l}*sigma_rho_est{1}*P{l}'; 
+    sig_XX_est_j1 = sig_est_j1(1:x_len,1:x_len);
+    sig_XX_est_j1_inv = inv(sig_XX_est_j1);
+    for j=1:r
         mu_est = P{l}*rho_est{j};
         mu_X_est = mu_est(1:x_len); 
         mu_Z_est = mu_est((x_len+1):end);
@@ -75,8 +82,19 @@ for j=1:r
         mu_Z_given_X{l,j} = ...
                 mu_Z_est + sig_XZ_est'*...
                 ((sig_XX_est)\(X{l}-mu_X_est)); %mu_{Z given X} or mu_{2|1}
-        % Calculate likelihood
-        pr_x_given_g(l,j) = min(1/eps,mvnpdf(X{l},mu_X_est,sig_XX_est)+eps);
+        % Calculate relative pdf
+        pr_x_given_g_rel(l,j) = det(sig_XX_est_j1_inv*sig_XX_est)^(-1/2)*...
+                                exp(-(1/2)*(X{l}-mu_X_est)'*...
+                                (sig_XX_est)*...
+                                (X{l}-mu_X_est)+...
+                                (1/2)*(X{l}-mu_X_est_j1)'*...
+                                (sig_XX_est_j1)*...
+                                (X{l}-mu_X_est_j1));
+        %Calculate absolute pdf
+        pr_x_given_g_abs(l,j) = (2*pi)^(-x_len/2)*det(sig_XX_est)^(-1/2)*...
+                                exp(-(1/2)*(X{l}-mu_X_est)'*...
+                                (sig_XX_est)*...
+                                (X{l}-mu_X_est));
     end
 end
 
@@ -88,7 +106,8 @@ end
 % Each column of pr_x_given_g is multiplied by corresponding scalar element
 % of alpha_est (jth) and then each row is divided by corresponding scalar
 % element of the L-vector sum(pr_x_given_g.*alpha_est,2); 
-pr_g_given_x = (pr_x_given_g.*alpha_est)./sum(pr_x_given_g.*alpha_est,2); 
+pr_g_given_x = (pr_x_given_g_rel.*alpha_est)./...
+                sum(pr_x_given_g_rel.*alpha_est,2); 
 pr_g_given_x_lsum = sum(pr_g_given_x,1); % sum over l index
 pr_g_given_x_ljsum = L; % sum over j=1,..,r is just 1, so l,j sum is L
 
