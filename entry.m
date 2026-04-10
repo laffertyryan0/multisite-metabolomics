@@ -2,11 +2,13 @@
 addpath('./src')
 
 %% Simulate Data
+
+random_seed = 8;
     
 num_metabolites = 50; %k
 num_labs = 100; %L
-average_fraction_missing_metabolites = 0.2;
-num_mixture_components = 2; %r
+average_fraction_missing_metabolites = .5;
+num_mixture_components = 1; %r
 mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
 num_subjects_per_lab = ones(num_labs,1)*100; 
 
@@ -21,7 +23,8 @@ num_subjects_per_lab = ones(num_labs,1)*100;
                               average_fraction_missing_metabolites, ...
                               num_mixture_components, ...
                               mixing_probabilities,...
-                              num_subjects_per_lab...
+                              num_subjects_per_lab,...
+                              random_seed...
                               );
     
 
@@ -78,12 +81,12 @@ pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = ...
-        vecL(randomCorrelationMatrix(num_metabolites)); % Random initialization
+        vecL(eye(num_metabolites)); % Random initialization
     sigma_rho_est{j} = ...
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 100*1./num_subjects_per_lab; % Lab-wise weighting factor for ...
+w = 10*1./num_subjects_per_lab; % Lab-wise weighting factor for ...
                                  % variances (L vector)
 
 % Metrics to track for plotting. All should have prefix plotvar
@@ -104,12 +107,12 @@ for em_iter=1:MAX_EM_ITERATIONS
     % and compare with true pearson correlation
     [...
      order] = ... % guessed ordering of the estimated rho vectors
-                displayMatrixComparison(rho_est,rho_state,4);
+                displayMatrixComparison(rho_est,true_rho,4);
 
     % Append new values to plotvar metrics
     for j=1:r
         estimated = rho_est{order(j)};
-        actual = vecL(rho_state{j});
+        actual = vecL(true_rho{j});
         plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
         plotvar_bias{j}(em_iter) = mean(estimated-actual);
     end
@@ -167,7 +170,7 @@ for j=1:r
 end
 legend(labels)
 ylabel("MSE")
-xlabel("EM ItErroreration")
+xlabel("EM Iteration")
 hold off
 
 figure,
