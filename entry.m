@@ -4,7 +4,7 @@ addpath('./src')
 %% Simulate data
 
 %set seed
-rng(10);
+rng(16);
 
 tic
 
@@ -13,7 +13,7 @@ k = 50;
 % We have L labs 
 L = 100;
 
-average_fraction_missing_metabolites = .0; % approx what proportion of 
+average_fraction_missing_metabolites = .3; % approx what proportion of 
                                            % metabolites
                                            % are missing (1 = all missing
                                            % 0 = none missing)
@@ -155,7 +155,7 @@ for l=1:L
 end
 
 
-MAX_EM_ITERATIONS = 300; % Outer loop
+MAX_EM_ITERATIONS = 10; % Outer loop
 MAX_GD_ITERATIONS = 50; % Inner PGD loop
 GD_TOLERANCE = 1;
 GD_LEARNING_RATE = 100*(.2/L)/max(n_subjects);
@@ -179,6 +179,10 @@ end
 
 w = 100*1./n_subjects; % Lab-wise weighting factor for variances (L vector)
 
+% Metrics to track for plotting. All should have prefix plotvar
+plotvar_mse = {};  %rho mse
+plotvar_bias = {}; %rho bias
+
 
 for em_iter=1:MAX_EM_ITERATIONS
     disp("=========================================================")
@@ -191,7 +195,17 @@ for em_iter=1:MAX_EM_ITERATIONS
 
     % Log intermediate spearman correlation matrix calculations
     % and compare with true pearson correlation
-    displayMatrixComparison(rho_est,rho_state,4);
+    [...
+     order] = ... % guessed ordering of the estimated rho vectors
+                displayMatrixComparison(rho_est,rho_state,4);
+
+    % Append new values to plotvar metrics
+    for j=1:r
+        estimated = rho_est{order(j)};
+        actual = vecL(rho_state{j});
+        plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
+        plotvar_bias{j}(em_iter) = mean(estimated-actual);
+    end
 
     % Show current alpha estimate
 
@@ -231,3 +245,32 @@ for em_iter=1:MAX_EM_ITERATIONS
 end
 
 %pearson_rho_est is the final estimate for the mean correlation matrix
+
+% Create some plots
+
+% 1) A plot of MSE for each of the mixture components
+
+figure,
+title("\rho_j Mean Squared Error")
+hold on
+labels = {};
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_mse{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("MSE")
+xlabel("EM ItErroreration")
+hold off
+
+figure,
+title("\rho_j Average Bias")
+hold on
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_bias{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("Error")
+xlabel("EM Iteration")
+hold off
