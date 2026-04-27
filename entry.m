@@ -31,11 +31,11 @@ if ~USE_REAL_DATA
                                   );
 elseif USE_REAL_DATA
 
-    num_mixture_components = 2; %r
+    num_mixture_components = 1; %r
 
     % Read dataset from ./data
     % Each lab is from a seperate CSV file
-    data_directory = './data/'
+    data_directory = './data/';
 
     % Create a master list of uids
     uid_list = {};
@@ -75,8 +75,8 @@ elseif USE_REAL_DATA
             end
         end
         
-        reported_spearman{1,end+1} = vecL(correlation_matrix);
-        reported_spearman_mask{1,end+1} = vecL(mask_matrix);
+        reported_spearman{1,end+1} = correlation_matrix;
+        reported_spearman_mask{1,end+1} = mask_matrix;
         if size(data,1)>0
             n_samples = [n_samples data.N(1)];
         else
