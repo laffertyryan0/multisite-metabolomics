@@ -3,7 +3,7 @@ addpath('./src')
 
 %% Switch between real or simulated data
 
-USE_REAL_DATA = true;
+USE_REAL_DATA = false;
 
 %% Simulate Data
    
@@ -11,7 +11,7 @@ USE_REAL_DATA = true;
 if ~USE_REAL_DATA
     num_metabolites = 50; %k
     num_labs = 100; %L
-    average_fraction_missing_metabolites = 0.0;
+    average_fraction_missing_metabolites = 0.5;
     num_mixture_components = 2; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
     num_subjects_per_lab = ones(num_labs,1)*100; 
@@ -149,7 +149,7 @@ for j = 1:r
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 100*1./n_samples; % Lab-wise weighting factor for ...
+w = 100./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
 
 
@@ -200,7 +200,8 @@ for em_iter=1:MAX_EM_ITERATIONS
                                                 MAX_GD_ITERATIONS, ...
                                                 GD_TOLERANCE, ...
                                                 INIT_GDVARS_RANDLY, ...
-                                                NEARCORR_PROJ);
+                                                NEARCORR_PROJ, ...
+                                                em_iter);
 
    
 end

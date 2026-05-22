@@ -9,14 +9,14 @@ USE_REAL_DATA = false;
 
 %% Simulate Data
    
-rng(44);
+rng(43);
 
-num_metabolites = 50; %k
-num_labs = 100; %L
-average_fraction_missing_metabolites = 0;
+num_metabolites = 30; %k
+num_labs = 60; %L
+average_fraction_missing_metabolites = 0.0;
 num_mixture_components = 2; %r
 mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
-num_subjects_per_lab = ones(num_labs,1)*6%000; 
+num_subjects_per_lab = ones(num_labs,1)*100;%000; 
 
 
 % We want to check whether it matters much if the variance is mis-specified
@@ -48,14 +48,14 @@ for j=1:r
     true_rho{j} = randomCorrelationMatrix(num_metabolites);
     if j==1
         true_rho{j} = eye(num_metabolites);
-        true_Sigrho_times_nsamples{j} = 1;%5.27;
+        % true_Sigrho_times_nsamples{j} = 1;%5.27;
     end
     if j==2
         true_rho{j} = .5*eye(num_metabolites) + ones(num_metabolites)*.5;
-        true_Sigrho_times_nsamples{j} = .75;%.33;
+        % true_Sigrho_times_nsamples{j} = .75;%.33;
     end
-  %   true_Sigrho_times_nsamples{j} =  5*getCovarianceOfCorrelations(true_rho{j}, ...
-   %                                      5-1); % 5 doesn't matter. n-1
+    true_Sigrho_times_nsamples{j} =  5*getCovarianceOfCorrelations(true_rho{j}, ...
+                                        5-1); % 5 doesn't matter. n-1
                                             % only appears multiplicatively
 end
 
@@ -135,8 +135,8 @@ end
 % end
 
 MAX_EM_ITERATIONS = 1000; % Outer loop
-MAX_GD_ITERATIONS = Inf; % Inner PGD loop
-GD_TOLERANCE = .01;
+MAX_GD_ITERATIONS = 100; % Inner PGD loop
+GD_TOLERANCE = 1;
 GD_LEARNING_RATE = 1e-2;%1e-7;%.01*(.2/num_labs)/max(n_samples);
 INIT_GDVARS_RANDLY = false;
 NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
@@ -153,14 +153,14 @@ pearson_rho_est = cell(1,r); % Update this on every EM iteration
 for j = 1:r
     rho_est{j} = ...
         vecL(randomCorrelationMatrix(num_metabolites)); % Random initialization
-    sigma_rho_est{j} = true_Sigrho_times_nsamples{j}; % because the way I 
+    %sigma_rho_est{j} = true_Sigrho_times_nsamples{j}; % because the way I 
     % set up the likelihood, the Sigma_rho represents the actual covariance
     % times the sample size. which is why we have the weight factor w
-        %sigma_rho_est{j} = 1*speye(num_metabolites*(num_metabolites-1)/2)%+...
+        sigma_rho_est{j} = 1*speye(num_metabolites*(num_metabolites-1)/2)%+...
        % 1;  
 end
 
-w = 1./n_samples; % Lab-wise weighting factor for ...
+w = 100./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
 
 
@@ -213,7 +213,8 @@ for em_iter=1:MAX_EM_ITERATIONS
                                                 MAX_GD_ITERATIONS, ...
                                                 GD_TOLERANCE, ...
                                                 INIT_GDVARS_RANDLY, ...
-                                                NEARCORR_PROJ);
+                                                NEARCORR_PROJ, ...
+                                                em_iter);
 
     disp('four')
     disp(rho_est)
@@ -227,3 +228,8 @@ for em_iter=1:MAX_EM_ITERATIONS
 end
 
 %pearson_rho_est is the final estimate for the mean correlation matrix
+
+%% Switch between real or simulated data
+
+USE_REAL_DATA = false;
+
