@@ -1,31 +1,94 @@
 %% Set path
 addpath('./src')
 
+%% Switch between real or simulated data
+
+USE_REAL_DATA = true;
+
 %% Simulate Data
+   
 
-random_seed = 8;
+if ~USE_REAL_DATA
+    num_metabolites = 50; %k
+    num_labs = 100; %L
+    average_fraction_missing_metabolites = 0.0;
+    num_mixture_components = 2; %r
+    mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
+    num_subjects_per_lab = ones(num_labs,1)*100; 
     
-num_metabolites = 50; %k
-num_labs = 100; %L
-average_fraction_missing_metabolites = .5;
-num_mixture_components = 1; %r
-mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
-num_subjects_per_lab = ones(num_labs,1)*100; 
+    [reported_spearman,...
+              reported_spearman_mask,...
+              n_samples,...
+              r,...
+              true_rho]...
+              ...
+                  =  simulateData(num_metabolites, ...
+                                  num_labs, ...
+                                  average_fraction_missing_metabolites, ...
+                                  num_mixture_components, ...
+                                  mixing_probabilities,...
+                                  num_subjects_per_lab...
+                                  );
+elseif USE_REAL_DATA
 
-[reported_spearman,...
-          reported_spearman_mask,...
-          n_samples,...
-          r,...
-          true_rho]...
-          ...
-              =  simulateData(num_metabolites, ...
-                              num_labs, ...
-                              average_fraction_missing_metabolites, ...
-                              num_mixture_components, ...
-                              mixing_probabilities,...
-                              num_subjects_per_lab,...
-                              random_seed...
-                              );
+    num_mixture_components = 1; %r
+
+    % Read dataset from ./data
+    % Each lab is from a seperate CSV file
+    data_directory = './data/';
+
+    % Create a master list of uids
+    uid_list = {};
+
+    files = dir(fullfile(data_directory,"*.csv"));
+    for file = files'
+        data = readtable(fullfile(data_directory,file.name));
+        uid_list = unique(vertcat(uid_list,data.OUTCOME_UID));
+    end
+
+    % Ingest and process the correlation matrix data
+    reported_spearman = {};
+    reported_spearman_mask = {};
+    n_samples = [];
+    
+    for file = files'
+        data = readtable(fullfile(data_directory,file.name));
+        correlation_matrix = zeros(size(uid_list)); 
+        mask_matrix = zeros(size(uid_list));
+        for i=1:size(uid_list,1)
+            for j=1:size(uid_list,1)
+                % Find index of (uid_list{i},uid_list{j}) pair
+                idx = find(all([strcmp(data.OUTCOME_UID,uid_list{i}) ...
+                    strcmp(data.EXPOSURE_UID,uid_list{j})],2));
+                if(size(idx,1)==0)
+                    % This entry is missing in this lab
+                    mask_matrix(i,j) = 0;
+                    correlation_matrix(i,j) = 0;
+                else
+                    if size(idx,1) > 1
+                        % Duplicate row. Ignore
+                        idx = idx(1);
+                    end
+                    mask_matrix(i,j) = 1;
+                    correlation_matrix(i,j) = data.C_CORR(idx);
+                end
+            end
+        end
+        
+        reported_spearman{1,end+1} = correlation_matrix;
+        reported_spearman_mask{1,end+1} = mask_matrix;
+        if size(data,1)>0
+            n_samples = [n_samples data.N(1)];
+        else
+            n_samples = [n_samples 0];
+        end
+    end
+
+    num_labs = size(files,1);
+    r = num_mixture_components;
+    num_metabolites = size(uid_list,1);
+end
+
     
 
 %% Using simulated data (lab aggregates only), estimate correlation matrix
@@ -66,7 +129,7 @@ end
 MAX_EM_ITERATIONS = 10; % Outer loop
 MAX_GD_ITERATIONS = 50; % Inner PGD loop
 GD_TOLERANCE = 1;
-GD_LEARNING_RATE = 100*(.2/num_labs)/max(num_subjects_per_lab);
+GD_LEARNING_RATE = 100*(.2/num_labs)/max(n_samples);
 INIT_GDVARS_RANDLY = true;
 NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
 
@@ -86,7 +149,7 @@ for j = 1:r
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 10*1./num_subjects_per_lab; % Lab-wise weighting factor for ...
+w = 100*1./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
 
 % Metrics to track for plotting. All should have prefix plotvar
@@ -115,6 +178,8 @@ for em_iter=1:MAX_EM_ITERATIONS
         actual = vecL(true_rho{j});
         plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
         plotvar_bias{j}(em_iter) = mean(estimated-actual);
+    if ~USE_REAL_DATA
+        displayMatrixComparison(rho_est,true_rho,4);
     end
 
     % Show current alpha estimate
