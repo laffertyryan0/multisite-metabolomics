@@ -13,7 +13,7 @@ function [reported_spearman,...
                                       )
     
     %set seed
-    rng(15);
+    rng(16);
     
     tic
     
@@ -22,7 +22,6 @@ function [reported_spearman,...
     % We have L labs 
     L = num_labs;
     
-    average_fraction_missing_metabolites = .0; 
     average_fraction_missing_metabolites = ...
           average_fraction_missing_metabolites;% approx what proportion of 
                                                % metabolites
