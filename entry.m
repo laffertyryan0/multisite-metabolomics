@@ -3,7 +3,7 @@ addpath('./src')
 
 %% Switch between real or simulated data
 
-USE_REAL_DATA = true;
+USE_REAL_DATA = false;
 
 %% Simulate Data
    
@@ -11,10 +11,11 @@ USE_REAL_DATA = true;
 if ~USE_REAL_DATA
     num_metabolites = 50; %k
     num_labs = 100; %L
-    average_fraction_missing_metabolites = 0.0;
+    average_fraction_missing_metabolites = 0.5;
     num_mixture_components = 2; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
     num_subjects_per_lab = ones(num_labs,1)*100; 
+    random_seed = 15;
     
     [reported_spearman,...
               reported_spearman_mask,...
@@ -27,7 +28,8 @@ if ~USE_REAL_DATA
                                   average_fraction_missing_metabolites, ...
                                   num_mixture_components, ...
                                   mixing_probabilities,...
-                                  num_subjects_per_lab...
+                                  num_subjects_per_lab,...
+                                  random_seed...
                                   );
 elseif USE_REAL_DATA
 
@@ -149,7 +151,7 @@ for j = 1:r
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 100*1./n_samples; % Lab-wise weighting factor for ...
+w = 1./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
 
 % Metrics to track for plotting. All should have prefix plotvar
@@ -168,18 +170,19 @@ for em_iter=1:MAX_EM_ITERATIONS
 
     % Log intermediate spearman correlation matrix calculations
     % and compare with true pearson correlation
-    [...
-     order] = ... % guessed ordering of the estimated rho vectors
-                displayMatrixComparison(rho_est,true_rho,4);
 
-    % Append new values to plotvar metrics
-    for j=1:r
-        estimated = rho_est{order(j)};
-        actual = vecL(true_rho{j});
-        plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
-        plotvar_bias{j}(em_iter) = mean(estimated-actual);
     if ~USE_REAL_DATA
-        displayMatrixComparison(rho_est,true_rho,4);
+        [...
+         order] = ... % guessed ordering of the estimated rho vectors
+                    displayMatrixComparison(rho_est,true_rho,4);
+    
+        % Append new values to plotvar metrics
+        for j=1:r
+            estimated = rho_est{order(j)};
+            actual = vecL(true_rho{j});
+            plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
+            plotvar_bias{j}(em_iter) = mean(estimated-actual);
+        end
     end
 
     % Show current alpha estimate
