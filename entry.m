@@ -3,7 +3,7 @@ addpath('./src')
 
 %% Switch between real or simulated data
 
-USE_REAL_DATA = true;
+USE_REAL_DATA = false;
 
 %% Simulate Data
    
@@ -11,10 +11,11 @@ USE_REAL_DATA = true;
 if ~USE_REAL_DATA
     num_metabolites = 50; %k
     num_labs = 100; %L
-    average_fraction_missing_metabolites = 0.0;
+    average_fraction_missing_metabolites = 0.5;
     num_mixture_components = 2; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
     num_subjects_per_lab = ones(num_labs,1)*100; 
+    random_seed = 15;
     
     [reported_spearman,...
               reported_spearman_mask,...
@@ -27,7 +28,8 @@ if ~USE_REAL_DATA
                                   average_fraction_missing_metabolites, ...
                                   num_mixture_components, ...
                                   mixing_probabilities,...
-                                  num_subjects_per_lab...
+                                  num_subjects_per_lab,...
+                                  random_seed...
                                   );
 elseif USE_REAL_DATA
 
@@ -126,7 +128,7 @@ for l=1:num_labs
 end
 
 
-MAX_EM_ITERATIONS = 300; % Outer loop
+MAX_EM_ITERATIONS = 10; % Outer loop
 MAX_GD_ITERATIONS = 50; % Inner PGD loop
 GD_TOLERANCE = 1;
 GD_LEARNING_RATE = 100*(.2/num_labs)/max(n_samples);
@@ -144,13 +146,17 @@ pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = ...
-        vecL(randomCorrelationMatrix(num_metabolites)); % Random initialization
+        vecL(eye(num_metabolites)); % Random initialization
     sigma_rho_est{j} = ...
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 100*1./n_samples; % Lab-wise weighting factor for ...
+w = 1./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
+
+% Metrics to track for plotting. All should have prefix plotvar
+plotvar_mse = {};  %rho mse
+plotvar_bias = {}; %rho bias
 
 
 for em_iter=1:MAX_EM_ITERATIONS
@@ -164,8 +170,19 @@ for em_iter=1:MAX_EM_ITERATIONS
 
     % Log intermediate spearman correlation matrix calculations
     % and compare with true pearson correlation
+
     if ~USE_REAL_DATA
-        displayMatrixComparison(rho_est,true_rho,4);
+        [...
+         order] = ... % guessed ordering of the estimated rho vectors
+                    displayMatrixComparison(rho_est,true_rho,4);
+    
+        % Append new values to plotvar metrics
+        for j=1:r
+            estimated = rho_est{order(j)};
+            actual = vecL(true_rho{j});
+            plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
+            plotvar_bias{j}(em_iter) = mean(estimated-actual);
+        end
     end
 
     % Show current alpha estimate
@@ -206,3 +223,32 @@ for em_iter=1:MAX_EM_ITERATIONS
 end
 
 %pearson_rho_est is the final estimate for the mean correlation matrix
+
+% Create some plots
+
+% 1) A plot of MSE for each of the mixture components
+
+figure,
+title("\rho_j Mean Squared Error")
+hold on
+labels = {};
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_mse{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("MSE")
+xlabel("EM Iteration")
+hold off
+
+figure,
+title("\rho_j Average Bias")
+hold on
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_bias{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("Error")
+xlabel("EM Iteration")
+hold off
