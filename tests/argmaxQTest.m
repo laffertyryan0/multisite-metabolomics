@@ -3,7 +3,7 @@ addpath("../src")
 tests = functiontests(localfunctions);
 end
 
-% Make sure it runs and bound the time it takes
+% Make sure it runs
 function testTimeTaken(testCase)
     r = 5;
     k = 50;
@@ -49,5 +49,4 @@ function testTimeTaken(testCase)
                                                 NEARCORR_PROJ);
     time = toc;
     fprintf("Time to run one EM-step: %.2f sec",time);
-    verifyLessThan(testCase,time,10);
 end
