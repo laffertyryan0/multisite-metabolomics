@@ -10,11 +10,12 @@ USE_REAL_DATA = false;
 
 if ~USE_REAL_DATA
     num_metabolites = 50; %k
-    num_labs = 100; %L
-    average_fraction_missing_metabolites = 0.5;
+    num_labs = 60; %L
+    average_fraction_missing_metabolites = 0.6;
     num_mixture_components = 2; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
-    num_subjects_per_lab = ones(num_labs,1)*100; 
+    num_subjects_per_lab = ones(num_labs,1)*1000; 
+    random_seed = 19;
     
     [reported_spearman,...
               reported_spearman_mask,...
@@ -27,7 +28,8 @@ if ~USE_REAL_DATA
                                   average_fraction_missing_metabolites, ...
                                   num_mixture_components, ...
                                   mixing_probabilities,...
-                                  num_subjects_per_lab...
+                                  num_subjects_per_lab,...
+                                  random_seed...
                                   );
 elseif USE_REAL_DATA
 
@@ -111,6 +113,14 @@ reported_pearson = cellfun(@spearmanToPearson,reported_spearman, ...
 reported_pearson_vecL = cellfun(@vecL,reported_pearson,...
                                     'UniformOutput',false);
 
+
+% Calculate Fisher transformed correlation matrices
+reported_fisher = cellfun(@atanh,reported_pearson, ...
+                                        'UniformOutput',false);
+reported_fisher_vecL = cellfun(@vecL,reported_fisher,...
+                                    'UniformOutput',false);
+
+
 % For each l, find the permutation matrix P_l that puts missing entries 
 % below observed entries. Let [X Z]' = P_l * vecL(reported_pearson)
 P = {}; 
@@ -121,17 +131,17 @@ X = {}; % Consists of all observed entries.
 for l=1:num_labs
     P{l} = getMaskOrderingMatrix(reported_spearman_mask_vecL{l});
     num_observed = sum(reported_spearman_mask_vecL{l});
-    X_Z = P{l}*reported_spearman_vecL{l};
+    X_Z = P{l}*reported_fisher_vecL{l};
     X{l} = X_Z(1:num_observed);
 end
 
 
-MAX_EM_ITERATIONS = 300; % Outer loop
-MAX_GD_ITERATIONS = 50; % Inner PGD loop
+MAX_EM_ITERATIONS = 30; % Outer loop
+MAX_GD_ITERATIONS = 1; % Inner PGD loop
 GD_TOLERANCE = 1;
 GD_LEARNING_RATE = 100*(.2/num_labs)/max(n_samples);
 INIT_GDVARS_RANDLY = true;
-NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
+NEARCORR_PROJ = false; % Do the correlation projection in the gd loop
 
 
 % Initialize EM parameters
@@ -149,8 +159,12 @@ for j = 1:r
         speye(num_metabolites*(num_metabolites-1)/2);  
 end
 
-w = 100./n_samples; % Lab-wise weighting factor for ...
+w = 1000./n_samples; % Lab-wise weighting factor for ...
                                  % variances (L vector)
+
+% Metrics to track for plotting. All should have prefix plotvar
+plotvar_mse = {};  %rho mse
+plotvar_bias = {}; %rho bias
 
 
 for em_iter=1:MAX_EM_ITERATIONS
@@ -164,8 +178,30 @@ for em_iter=1:MAX_EM_ITERATIONS
 
     % Log intermediate spearman correlation matrix calculations
     % and compare with true pearson correlation
+    % Log intermediate spearman correlation matrix calculations
+    % and compare with true pearson correlation
+
     if ~USE_REAL_DATA
-        displayMatrixComparison(rho_est,true_rho,4);
+
+
+        true_rho_fisher = cellfun(@atanh,true_rho, ... % the pearson
+                                        'UniformOutput',false);
+        rho_est_fisherinv = cellfun(@tanh,rho_est, ... % the pearson
+                                        'UniformOutput',false);
+        displayMatrixComparison(rho_est_fisherinv,true_rho,4);
+
+        [...
+         order] = ... % guessed ordering of the estimated rho vectors
+                    displayMatrixComparison(rho_est_fisherinv,...
+                                    true_rho,4);
+    
+        % Append new values to plotvar metrics
+        for j=1:r
+            estimated = rho_est_fisherinv{order(j)};
+            actual = vecL(true_rho{j});
+            plotvar_mse{j}(em_iter) = norm(estimated-actual,2);
+            plotvar_bias{j}(em_iter) = mean(estimated-actual);
+        end
     end
 
     % Show current alpha estimate
@@ -190,7 +226,8 @@ for em_iter=1:MAX_EM_ITERATIONS
     % GD_TOLERANCE: If the gradient steps fall below this tolerance, the 
     %               gradient descent loop will cease.
 
-    [alpha_est,rho_est,sigma_rho_est] = argmaxQ(alpha_est,...
+    [alpha_est,rho_est,sigma_rho_est] = argmaxQFisher(...
+                                                alpha_est,...
                                                 rho_est,...
                                                 sigma_rho_est, ...
                                                 X, ...
@@ -207,3 +244,32 @@ for em_iter=1:MAX_EM_ITERATIONS
 end
 
 %pearson_rho_est is the final estimate for the mean correlation matrix
+
+% Create some plots
+
+% 1) A plot of MSE for each of the mixture components
+
+figure,
+title("\rho_j Mean Squared Error")
+hold on
+labels = {};
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_mse{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("MSE")
+xlabel("EM Iteration")
+hold off
+
+figure,
+title("\rho_j Average Bias")
+hold on
+for j=1:r
+    plot(1:MAX_EM_ITERATIONS,plotvar_bias{j})
+    labels{j} = strcat("Component ",num2str(j));
+end
+legend(labels)
+ylabel("Error")
+xlabel("EM Iteration")
+hold off
