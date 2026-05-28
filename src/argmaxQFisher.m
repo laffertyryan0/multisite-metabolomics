@@ -1,5 +1,5 @@
 function [alpha_est_new,rho_est_new,sigma_rho_est_new] = ...
-                                                argmaxQ(alpha_est,...
+                                                argmaxQFisher(alpha_est,...
                                                         rho_est,...
                                                         sigma_rho_est, ...
                                                         X, ...
@@ -9,7 +9,7 @@ function [alpha_est_new,rho_est_new,sigma_rho_est_new] = ...
                                                         max_iterations, ...
                                                         tol, ...
                                                         INIT_GDVARS_RANDLY, ...
-                                                        NEARCORR_PROJ, ...
+                                                        NEARCORR_PROJ,...
                                                         em_iteration)
 % Calculates the values for alpha_tilde, rho_tilde and sigma_rho_tilde
 % that maximize Q(alpha_tilde, rho_tilde, sigma_rho_tilde | alpha_est,
@@ -21,9 +21,7 @@ function [alpha_est_new,rho_est_new,sigma_rho_est_new] = ...
 % sigma_rho_est: a cell array of L cells, where sigma_est{l} is a 
 %             (k(k-1)/2) x (k(k-1)/2) covariance matrix.
 %
-% Projected gradient descent will be used to ensure that rho_tilde remains  
-% a vectorization of a valid correlation matrix
-
+% NO GRAD
 % Step 1: Initialize the tilde variables (variables being optimized over)
 
 L = length(X);
@@ -50,10 +48,12 @@ else
 end
 
 % DEBUG %%%%
-% for j = 1:r
-%     sigma_rho_tilde{j} = (1/mean(w))*getCovarianceOfCorrelations(...
-%                             vecLInverse(rho_est{j}),1/mean(w));
-% end
+ % if mod(em_iteration,100)==0
+ %    for j = 1:r
+ %        sigma_rho_tilde{j} = (1/mean(w))*getCovarianceOfCorrelations(...
+ %                                vecLInverse(rho_est{j}),1/mean(w));
+ %    end
+ % end
 %%%%%%%%%%%%
 
 
@@ -108,14 +108,13 @@ for l=1:L
                                 ((sig_XX_est)\...
                                 (X{l}-mu_X_est)));
         %Calculate log pdf
-        pr_x_given_g_log(l,j) = log((2*pi)^(-x_len/2)*det(sig_XX_est)^(-1/2))-...
-                                (1/2)*(X{l}-mu_X_est)'*...
-                                ((sig_XX_est)\...
-                                (X{l}-mu_X_est));
+        % pr_x_given_g_log(l,j) = log((2*pi)^(-x_len/2)*det(sig_XX_est)^(-1/2))-...
+        %                         (1/2)*(X{l}-mu_X_est)'*...
+        %                         ((sig_XX_est)\...
+        %                         (X{l}-mu_X_est));
     end
 end
 
-% Prevent Inf values in rel
 pr_x_given_g_rel(isinf(pr_x_given_g_rel)) = 1e20;
 
 % pr_g_given_x: Prob (Gamma_lj = 1 | X, theta). Calculate using Bayes
@@ -172,65 +171,44 @@ end
 
 % 
 % % Step 3: Loop until max_iterations or ||gradient|| < tol
-while iteration <= max_iterations && norm_grad >= tol
+while iteration <= max_iterations 
     iteration = iteration + 1;
 
-    % Step 3.1: Compute derivative of Q for remaining optimization (tilde) 
-    %           variables (rho_tilde)
-
-                gradient_rho_tilde = cell(1,r); % k(k-1)/2-vector for each 
-                                                % cell l
-                for i = 1:r
-                    % Compute the sum of the l-summands
-                    total = 0;
-                    for l = 1:L
-                        % l'th term in rho gradient sum 
-                        total = total + ...
-                           pr_g_given_x(l,i)*...
-                           P{l}'*((w(l)*P{l}*sigma_rho_tilde{i}*P{l}')\...
-                           ([X{l} ; mu_Z_given_X{l,i}] - ...
-                           P{l}*rho_tilde{i}));
-                    end
-                    denom_total = 0;
-                    for l = 1:L
-                        denom_total = denom_total + ...
-                           pr_g_given_x(l,i)*...
-                           P{l}'*inv(w(l)*P{l}*sigma_rho_tilde{i}*P{l}');
-                    end
-                    gradient_rho_tilde{i} = total;%denom_total\total;
-                end
-
-
-    % Step 3.2: Apply the gradient step to remaining optimization (tilde) 
-    %           variables (rho_tilde)
-
+    % Step 3.1: Minimize Q with respect to rho_tilde, not respecting the
+    %           constraint
+            
                 for j=1:r
-                    increment = learning_rate*gradient_rho_tilde{j};
-                    rho_tilde{j} = rho_tilde{j} + increment;
+                    num = 0;
+                    denom = 0;
+                    for l=1:L
+                        num = num + ...
+                            pr_g_given_x(l,j)*(1/w(l))*P{l}'*...
+                            [X{l} ; mu_Z_given_X{l,j}];
+                        denom = denom + ...
+                            pr_g_given_x(l,j)*(1/w(l));
+                    end
+                    rho_tilde{j} = (num)/(denom+eps);
                 end
 
-                % rhos1 = [rhos1 ; rho_tilde{1}];
-                % rhos2 = [rhos2 ; rho_tilde{2}];
 
-    % Step 3.3: Apply the correlation projection to rho_tilde. Will need
+    % Step 3.2: Apply the correlation projection to rho_tilde. Will need
     %           to convert to matrix form, apply projection, and convert
     %           back to vector form. 
 
                 if(NEARCORR_PROJ)
                     for j=1:r
                         matrix_rho_tilde = vecLInverse(rho_tilde{j});
+                        % Inverse fisher transformation
+                        matrix_rho_tilde = tanh(matrix_rho_tilde); 
                         matrix_rho_tilde = ensureValidNearCorrInput(...
                                                 matrix_rho_tilde,.01);
                         matrix_rho_tilde = nearcorr(matrix_rho_tilde);
+                        % Fisher transformation
+                        matrix_rho_tilde = atanh(matrix_rho_tilde);
                         rho_tilde{j} = vecL(matrix_rho_tilde);
                     end
                 end
 
-                norm_grad = 0; % maximum of all the gradient norms
-                for j=1:r
-                    norm_grad = max(norm_grad, norm(gradient_rho_tilde{j}));
-                end
-                norm_grad = norm_grad;
 
 end
 % figure
@@ -249,11 +227,5 @@ alpha_est_new = alpha_tilde;
 rho_est_new = rho_tilde;
 sigma_rho_est_new = sigma_rho_tilde;
 
-disp("alpha_est")
-disp(alpha_est_new)
-disp("rho_est")
-disp(rho_est_new)
-disp("sigma_rho_est")
-disp(sigma_rho_est_new)
 
 end
