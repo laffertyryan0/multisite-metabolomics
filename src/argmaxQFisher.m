@@ -200,6 +200,7 @@ while iteration <= max_iterations
                         matrix_rho_tilde = vecLInverse(rho_tilde{j});
                         % Inverse fisher transformation
                         matrix_rho_tilde = tanh(matrix_rho_tilde); 
+                        matrix_rho_tilde(logical(eye(k))) = 1;
                         matrix_rho_tilde = ensureValidNearCorrInput(...
                                                 matrix_rho_tilde,.01);
                         matrix_rho_tilde = nearcorr(matrix_rho_tilde);
