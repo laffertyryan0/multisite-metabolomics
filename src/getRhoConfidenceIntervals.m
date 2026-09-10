@@ -16,7 +16,7 @@ function CI = getRhoConfidenceIntervals(alpha_est,...
             rho_FI_est = FI_est(max(1,num_mixture_components-1):end,...
                     max(1,num_mixture_components-1):end); % only rho part
             a = .05; % TODO make this a variable
-            std_err = vecLInverse(sqrt(abs(diag(inv(rho_FI_est)))));
+            std_err = vecLInverse(sqrt(abs(diag(pinv(rho_FI_est)))));
             %disp(std_err');
             j=1;
             z = norminv(1-a/2);
