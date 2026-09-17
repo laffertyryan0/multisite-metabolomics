@@ -27,3 +27,5 @@ The following is an illustration of the proposed methodology:
 ![Alt text](./img/diagram.svg )
 
 To use this project, run `entry.m`. Explanatory notes are provided as in-line comments. 
+
+AI coding assistants were not used in this repository. All code is human-authored. 
