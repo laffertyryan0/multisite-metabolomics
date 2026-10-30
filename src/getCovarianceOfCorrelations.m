@@ -1,7 +1,7 @@
 function covR = getCovarianceOfCorrelations(rho,sample_size)
     k = size(rho,1); % matrix width
     n = sample_size - 1; % n used in P&F expression
-    covR = zeros(k*(k+1)/2,k*(k+1)/2);
+    covR = zeros(k*(k-1)/2,k*(k-1)/2);
     % covR = cov(vecL(r),vecL(r))
 
     
@@ -35,14 +35,14 @@ function covR = getCovarianceOfCorrelations(rho,sample_size)
     
     idx = [];
     t = 1;
-    for i=2:k
-        for j=1:(i-1)
-            idx(t,:) = [j,i];
+    for i=1:(k-1)
+        for j=(i+1):k
+            idx(t,:) = [i,j];
             t = t + 1;
         end
     end
     
-    covR = zeros(height(idx),height(idx));
+    covR = zeros(k*(k-1)/2,k*(k-1)/2);
     for i=1:size(covR,1)
         for j=1:size(covR,1)
             covR(i,j) = pf(idx(i,1),idx(i,2),idx(j,1),idx(j,2));

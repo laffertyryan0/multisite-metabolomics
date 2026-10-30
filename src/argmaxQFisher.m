@@ -48,13 +48,24 @@ else
 end
 
 % DEBUG %%%%
- % if mod(em_iteration,100)==0
- %    for j = 1:r
- %        sigma_rho_tilde{j} = (1/mean(w))*getCovarianceOfCorrelations(...
- %                                vecLInverse(rho_est{j}),1/mean(w));
- %    end
- % end
+ if mod(em_iteration,1)==0
+    for j = 1:r
+        sigma_rho_est{j} = ((1/mean(w)-3)*getCovarianceOfCorrelationsFisher(...
+                                vecLInverse(rho_est{j}),1/mean(w)) + ...
+                                .01*eye(len_rho))/1.01;
+        sigma_rho_tilde = sigma_rho_est;
+    end
+ end
 %%%%%%%%%%%%
+% 
+% disp(min(eig(sigma_rho_est{1})))
+% disp(rho_tilde{1})
+% if min(eig(sigma_rho_est{1}))<=.1
+%     disp("hip")
+% end
+% if max(rho_tilde{1})>2
+%     disp("hi")
+% end
 
 
 iteration = 1;

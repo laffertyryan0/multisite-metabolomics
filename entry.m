@@ -11,7 +11,7 @@ USE_REAL_DATA = false;
 if ~USE_REAL_DATA
     num_metabolites = 50; %k
     num_labs = 60; %L
-    average_fraction_missing_metabolites = 0.7;
+    average_fraction_missing_metabolites = 0.9;
     num_mixture_components = 1; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
     num_subjects_per_lab = ones(num_labs,1)*1000; 
@@ -162,12 +162,12 @@ for l=1:num_labs
 end
 
 
-MAX_EM_ITERATIONS = 500%30; % Outer loop
+MAX_EM_ITERATIONS = 2000; % Outer loop
 MAX_GD_ITERATIONS = 1; % Inner PGD loop
 GD_TOLERANCE = 1;
 GD_LEARNING_RATE = 100*(.2/num_labs)/max(n_samples);
 INIT_GDVARS_RANDLY = true;
-NEARCORR_PROJ = false; % Do the correlation projection in the gd loop
+NEARCORR_PROJ = true; % Do the correlation projection in the gd loop
 
 
 % Initialize EM parameters
@@ -180,7 +180,7 @@ pearson_rho_est = cell(1,r); % Update this on every EM iteration
 
 for j = 1:r
     rho_est{j} = ...
-        vecL(randomCorrelationMatrix(num_metabolites)); % Random initialization
+        1+0*vecL(randomCorrelationMatrix(num_metabolites)); % Random initialization
     sigma_rho_est{j} = ...
         speye(num_metabolites*(num_metabolites-1)/2);  
 end

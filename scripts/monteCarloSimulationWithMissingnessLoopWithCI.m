@@ -10,21 +10,21 @@ variable_mask_record = {};
 CIs = {};
 CIs_noproj = {};
 
-missing_iters = 30; %.0 to .9 = 1 to 10
-max_mi = 1;
+missing_iters = 20; %.0 to .9 = 1 to 10
+max_mi = .6;
 missingnesses = ((1:missing_iters)-1)*(max_mi/missing_iters); % .7:.05:.95%
 missing_iters = length(missingnesses); % DEBUG
 for missing_iter = 1:missing_iters
     
     %% Fix Parameters
     
-    num_metabolites = 5%50; %k
-    num_labs = 30%60; %L
+    num_metabolites = 20; %k
+    num_labs = 15; %L
     average_fraction_missing_metabolites = missingnesses(missing_iter);
     num_mixture_components = 1; %r
     mixing_probabilities = ones(1,num_mixture_components)/num_mixture_components;
-    num_subjects_per_lab = ones(num_labs,1)*50;
-    num_subjects_per_lab(1:5) = 5;
+    num_subjects_per_lab = ones(num_labs,1)*1000;
+    %num_subjects_per_lab(1:5) = 50;0
     
     rng(6); % Set seed for the whole simulation 
     rho_state = {};
@@ -37,8 +37,8 @@ for missing_iter = 1:missing_iters
         if j==1
            rho_state{j} = patternedBlockCorrelation(num_metabolites, ...
                                                 .7, ...
-                                                20, ...
-                                                20,...
+                                                8, ...
+                                                8,...
                                                 -.1);
         end
 
@@ -52,25 +52,25 @@ for missing_iter = 1:missing_iters
     end
 
 %%%DEBUG%%%%
-    % % Ensure at least one lab per pair
-    % for i1 = 1:num_metabolites
-    %     for i2 = 1:num_metabolites
-    %         in_at_least_one = false;
-    %         for l=1:num_labs
-    %             if subject_data_mask{l}(i1)==1 && ...
-    %                     subject_data_mask{l}(i2)==1
-    %                 in_at_least_one = true;
-    %             end
-    %         end
-    %         if ~in_at_least_one
-    %             % Randomly choose a lab
-    %             forceL = randi(num_labs);
-    %             % Force forceL to have both
-    %             subject_data_mask{forceL}(i1) = 1;
-    %             subject_data_mask{forceL}(i2) = 1;
-    %         end
-    %     end
-    % end
+    % Ensure at least one lab per pair
+    for i1 = 1:num_metabolites
+        for i2 = 1:num_metabolites
+            in_at_least_one = false;
+            for l=1:num_labs
+                if subject_data_mask{l}(i1)==1 && ...
+                        subject_data_mask{l}(i2)==1
+                    in_at_least_one = true;
+                end
+            end
+            if ~in_at_least_one
+                % Randomly choose a lab
+                forceL = randi(num_labs);
+                % Force forceL to have both
+                subject_data_mask{forceL}(i1) = 1;
+                subject_data_mask{forceL}(i2) = 1;
+            end
+        end
+    end
 %%%%%%%%%%%
 
     % Ensure at least two non-missing in each lab
@@ -91,7 +91,7 @@ for missing_iter = 1:missing_iters
     final_rho_estimates = {};
 
     
-    MC_STEPS = 20;
+    MC_STEPS = 100;
     for mc_step = 1:MC_STEPS
         
         [reported_spearman,...
@@ -154,7 +154,7 @@ for missing_iter = 1:missing_iters
         end
         
         
-        MAX_EM_ITERATIONS = 50; % Outer loop
+        MAX_EM_ITERATIONS = 25; % Outer loop
         MAX_GD_ITERATIONS = 1; % Inner PGD loop
         GD_TOLERANCE = 1;
         GD_LEARNING_RATE = 100*(.2/num_labs)/max(n_samples);
@@ -195,7 +195,7 @@ for missing_iter = 1:missing_iters
                 num_labs, ...
                 n_samples);
 
-        sigma_rho_est{1} = variance_est;%diag(diag(variance_est));
+        sigma_rho_est{1} = diag(diag(variance_est));%variance_est;
         sigma_rho_est_no_proj = sigma_rho_est;
         clear variance_est;
         disp(toc);
@@ -451,6 +451,12 @@ LOAD_FILENAME = [];
 %LOAD_FILENAME = "../artifacts/mc_ml_runs/mc_ml_run_20260829_201437.mat"
 %LOAD_FILENAME = "../artifacts/mc_ml_runs/mc_ml_run_20260831_223707.mat"
 
+%LOAD_FILENAME = "../artifacts/mc_ml_runs/mc_ml_run_20261014_000649.mat"
+%LOAD_FILENAME = "../artifacts/mc_ml_runs/mc_ml_run_20261022_192531.mat"
+
+%Below is in paper
+%LOAD_FILENAME = "../artifacts/mc_ml_runs/mc_ml_run_20261027_220114.mat";
+
 if ~isempty(LOAD_FILENAME)
     load(LOAD_FILENAME);
 else
@@ -515,12 +521,12 @@ for j=1:r
 
 
     hold on;
-    p1 = plot(missingnesses,mse_by_mprob_nearcorr,'Color','blue','DisplayName','EM with projection');
-    p2 = plot(missingnesses,mse_by_mprob_no_proj,'Color','red','DisplayName','EM w/o projection');
+    p1 = plot(missingnesses,mse_by_mprob_nearcorr,'Color','blue','DisplayName','EM result');%,'DisplayName','EM with projection');
+   % p2 = plot(missingnesses,mse_by_mprob_no_proj,'Color','red','DisplayName','EM w/o projection');
     p1.LineWidth = 2;
     p1.Marker = "*";
-    p2.LineWidth = 2;
-    p2.Marker = "o";
+   % p2.LineWidth = 2;
+   % p2.Marker = "o";
     % Only plot the naive if there are more than one component
     % Otherwise its too confusing
     % if r<=1
@@ -542,12 +548,12 @@ set(gcf, 'PaperPositionMode', 'auto');
 grid on
 xlabel("Proportion of metabolites missing");
 ylabel("Mean Absolute Error (Component Average)")
-xlim([.1,.95])
+xlim([missingnesses(1),missingnesses(end)])%.95])
 
 % plot a few components on different figures with CIs and true 
 if r<=1
-    for a=[1,2]%[1,2,25,30]
-        for b=[3,4]%[2,25,28,49]
+    for a=[1,2,15]%[1,2,25,30]
+        for b=[3,4,17]%[2,25,28,49]
             figure,
 
             band_lower_nc = zeros(missing_iters,1);
@@ -584,25 +590,28 @@ if r<=1
             y2conf = [ band_lower_noproj' band_upper_noproj(end:-1:1)'];
             
             hold on
-            p = fill(xconf,yconf,'blue','DisplayName','EM with projection');
+            p = fill(xconf,yconf,'blue','DisplayName','95% Confidence Region');%,'DisplayName','EM with projection');
             p.FaceColor = [.8 0.8 1];         
             p.EdgeColor = 'none';   
             p.FaceAlpha = .5;
 
 
-            p2 = fill(xconf,y2conf,'red','DisplayName','EM w/o projection');
-            p2.EdgeColor = 'none';   
-            p2.FaceColor = [1 0.8 0.8];   
-            p2.FaceAlpha = .5;
+            % p2 = fill(xconf,y2conf,'red','DisplayName','EM w/o projection');
+            % p2.EdgeColor = 'none';   
+            % p2.FaceColor = [1 0.8 0.8];   
+            % p2.FaceAlpha = .5;
+
+            true_rho_fish = atanh(true_rho{1}(a,b));
+            yline(true_rho_fish,'--r','DisplayName','True Parameter');
 
             %ylim([-.9,.9])
             xlim([missingnesses(1),missingnesses(end-1)]);
 
             legend
             grid on
-            title(strcat("(i,j) = (",string(a),",",string(b),")"))
+            title(strcat("Matrix Component (i,j) = (",string(a),",",string(b),")"))
             %plot()
-            %plot(x,y,'ro')
+           % plot(x,y,'ro')
             hold off
         end
     end
@@ -708,6 +717,7 @@ end
 %% Plot the Coverage probabilites for CIs
 % coverage prob = percent of cis that contain the true rho
      %   i = 48; j = 4; % look at (i,j) correlation component
+ cov_prob = zeros(num_metabolites,num_metabolites);
  for missing_iter = 1:missing_iters
     %missing_iter = 5;
     for i=1:num_metabolites
